@@ -1,8 +1,14 @@
-# vinext-starter
+# Kangjie Lead
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+海外买家发现、需求验证、个性化邮件发送和回复跟进工作台。
+
+## 邮箱配置
+
+本地邮件设置集中保存在 `.env`。复制 `.env.example` 后填写 Google OAuth 的
+`GMAIL_CLIENT_ID`、`GMAIL_CLIENT_SECRET`、`GMAIL_REFRESH_TOKEN`，并为
+`MAIL_WEBHOOK_SECRET` 设置随机长字符串。`.env` 已被 Git 忽略，不会进入仓库。
+
+`GET /api/email/config` 只返回配置状态和缺失字段，不会返回任何密钥。
 
 ## Prerequisites
 
