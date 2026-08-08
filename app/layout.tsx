@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Kangjie Lead — 海外自动获客系统",
+  title: "外贸获客系统",
   description: "从买家发现、需求验证到邮件发送和回复跟进的一体化外贸获客工作台。",
   icons: {
     icon: "/favicon.svg",

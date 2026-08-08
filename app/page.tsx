@@ -47,7 +47,7 @@ export default function Home() {
   return (
     <main className="app-shell">
       <aside className="sidebar">
-        <div className="brand"><span className="brand-mark">K</span><div><strong>Kangjie Lead</strong><small>海外获客工作台</small></div></div>
+        <div className="brand"><span className="brand-mark">外</span><div><strong>外贸获客系统</strong><small>海外买家开发工作台</small></div></div>
         <nav aria-label="主导航">
           {nav.map((item, index) => (
             <button key={item} className={active === item ? "nav-item active" : "nav-item"} onClick={() => setActive(item)}>
