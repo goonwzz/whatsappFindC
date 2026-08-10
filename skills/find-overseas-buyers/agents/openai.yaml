@@ -1,4 +1,4 @@
 interface:
   display_name: "外贸买家获取"
-  short_description: "按目标国家与产品资料查找、验证并评分海外潜在采购企业"
-  default_prompt: "使用 $find-overseas-buyers，根据目标国家和产品信息查找有证据支持的潜在买家。"
+  short_description: "按目标国家与HS编码查找、验证并评分真实进口采购企业"
+  default_prompt: "使用 $find-overseas-buyers，根据目标国家和HS编码查找有海关证据支持的潜在买家。"
