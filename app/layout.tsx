@@ -1,23 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-
-export const metadata: Metadata = {
-  title: "外贸获客系统",
-  description: "从买家发现、需求验证到邮件发送和回复跟进的一体化外贸获客工作台。",
-  icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
-  },
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html lang="zh-CN">
-      <body>{children}</body>
-    </html>
-  );
-}
+import "./results.css";
+export const metadata: Metadata = { title: "贝贝家外贸复制系统", description: "杭州临安贝贝家公司外贸获客实地测试系统" };
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) { return <html lang="zh-CN"><body>{children}</body></html>; }

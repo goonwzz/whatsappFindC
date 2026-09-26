@@ -1,0 +1,4 @@
+interface:
+  display_name: "四类目标客户查找"
+  short_description: "多渠道查找四类海外客户、采购人及中国采购关联证据"
+  default_prompt: "使用 $find-target-buyers 扩大候选池，多渠道查找四类客户，核验采购关系与公开决策人，并返回业务报告和结构化JSON。"
