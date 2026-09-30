@@ -2,7 +2,7 @@
 
 Return one JSON object with `summary`, `categories`, `overflow_candidates`, and `duplicates`. `categories` and `overflow_candidates` must always contain `large_chain`, `small_store`, `import_distributor`, `online_store`, and `custom_target` arrays.
 
-The root object also includes `generated_at` as an ISO timestamp and `task` with `country`, `city`, `product_description`, `target_customer_prompt`, optional `hs_code`, and optional `product_description_en`. Use an empty string for an omitted HS code. The HTML page uses these fields to identify the latest result, preserve city-level deduplication, and build outreach copy.
+The root object also includes `generated_at` as an ISO timestamp and `task` with the submitted `target_region`, normalized `country`, normalized `city` or service-area string, resolved `product_description`, resolved `product_description_en`, resolved `target_customer_prompt`, optional `hs_code`, and `supplier_profile`. In website-first mode, add `supplier_website_evidence`: an array of source URLs used to resolve the supplier and product profile. Use an empty string for an omitted HS code. The HTML page uses these fields to identify the latest result, preserve region-level deduplication, and build outreach copy.
 
 `summary` contains `candidates_reviewed`, `requested`, `qualified`, `overflow_count`, `with_named_contact`, `with_public_email`, `china_sourcing_strong`, `china_sourcing_moderate`, `discovery_channels_used`, and `coverage_note`.
 

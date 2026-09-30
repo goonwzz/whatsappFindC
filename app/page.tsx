@@ -5,7 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 type Direction = "large_chain" | "small_store" | "import_distributor" | "online_store" | "custom_target";
 type SourcingEvidence = { signal: string; score: number; url: string };
 type Buyer = { company: string; customer_type: Direction; website: string; product_fit_score: number; demand_status: string; contact_person: string; contact_title: string; person_email: string; company_email: string; phone: string; whatsapp: string; whatsapp_greeting_en?: string; whatsapp_greeting_basis?: string; linkedin_url?: string; contact_confidence?: string; contact_evidence?: string; contact_verified_at?: string; contact_person_score?: number; contact_channel_score?: number; recommended_contact_path?: string; product_fit_evidence: string; demand_evidence: string; discovery_channels?: string[]; china_sourcing_score?: number; china_sourcing_status?: string; china_sourcing_evidence?: SourcingEvidence[]; source_urls: string[] };
-type BuyerResult = { generated_at: string; task: { country: string; city?: string; hs_code?: string; product_description: string; product_description_en?: string; target_customer_prompt?: string; search_policy?: { candidate_pool_multiplier?: number } }; summary: { candidates_reviewed?: number; requested: number; qualified: number; overflow_count?: number; with_named_contact: number; with_public_email: number; china_sourcing_strong?: number; china_sourcing_moderate?: number; discovery_channels_used?: string[]; coverage_note: string }; categories: Partial<Record<Direction, Buyer[]>>; overflow_candidates?: Partial<Record<Direction, Buyer[]>> };
+type ManufacturerProfile = { id: string; preset_name: string; company_name: string; contact_name: string; email: string; whatsapp: string; website: string; location: string; company_intro_en: string; strengths_en: string };
+type BuyerResult = { generated_at: string; task: { supplier_profile?: Partial<ManufacturerProfile>; target_region?: string; country: string; city?: string; hs_code?: string; product_description: string; product_description_en?: string; target_customer_prompt?: string; search_policy?: { candidate_pool_multiplier?: number } }; summary: { candidates_reviewed?: number; requested: number; qualified: number; overflow_count?: number; with_named_contact: number; with_public_email: number; china_sourcing_strong?: number; china_sourcing_moderate?: number; discovery_channels_used?: string[]; coverage_note: string }; categories: Partial<Record<Direction, Buyer[]>>; overflow_candidates?: Partial<Record<Direction, Buyer[]>> };
 type Channel = "email" | "whatsapp";
 type OutreachStatus = "draft" | "approved" | "sent" | "replied";
 type DraftVersion = { subject: string; body: string };
@@ -22,13 +23,21 @@ const directions: Array<{ key: Direction; label: string; note: string; roles: st
 ];
 
 export default function Home() {
-  const [supplierCompany, setSupplierCompany] = useState("allwall");
+  const [supplierCompany, setSupplierCompany] = useState("");
+  const [supplierLocation, setSupplierLocation] = useState("");
+  const [supplierWebsite, setSupplierWebsite] = useState("");
+  const [supplierIntroEn, setSupplierIntroEn] = useState("");
+  const [supplierStrengthsEn, setSupplierStrengthsEn] = useState("");
+  const [presetName, setPresetName] = useState("");
+  const [manufacturerPresets, setManufacturerPresets] = useState<ManufacturerProfile[]>([]);
+  const [activePresetId, setActivePresetId] = useState("");
+  const [targetRegion, setTargetRegion] = useState("");
   const [country, setCountry] = useState("");
   const [city, setCity] = useState("");
-  const [hsCode, setHsCode] = useState("6303920090");
-  const [product, setProduct] = useState("合成纤维制窗帘、帷幔、室内百叶帘及床帷等家纺产品，可按尺寸、颜色、面料和包装要求定制");
-  const [productEnglish, setProductEnglish] = useState("custom-made products with flexible specifications, colours and retail packaging");
-  const [targetCustomerPrompt, setTargetCustomerPrompt] = useState("优先寻找整装设计师、室内设计工作室和装修公司，尤其是承接住宅、酒店或商业空间整体项目的单位");
+  const [hsCode, setHsCode] = useState("");
+  const [product, setProduct] = useState("");
+  const [productEnglish, setProductEnglish] = useState("");
+  const [targetCustomerPrompt, setTargetCustomerPrompt] = useState("");
   const [exclude, setExclude] = useState("同类生产工厂、出口供应商");
   const [existing, setExisting] = useState("");
   const [counts, setCounts] = useState<Record<Direction, number>>({ large_chain: 5, small_store: 5, import_distributor: 5, online_store: 5, custom_target: 5 });
@@ -41,9 +50,9 @@ export default function Home() {
   const [languageVersion, setLanguageVersion] = useState<"local" | "english">("local");
   const [draft, setDraft] = useState<OutreachDraft | null>(null);
   const [outreachStatus, setOutreachStatus] = useState<OutreachStatus>("draft");
-  const [senderName, setSenderName] = useState("Brien");
-  const [senderEmail, setSenderEmail] = useState("goonwzz@gmail.com");
-  const [senderWhatsapp, setSenderWhatsapp] = useState("+86 15558008200");
+  const [senderName, setSenderName] = useState("");
+  const [senderEmail, setSenderEmail] = useState("");
+  const [senderWhatsapp, setSenderWhatsapp] = useState("");
   const [showAutomation, setShowAutomation] = useState(false);
   const [autoMail, setAutoMail] = useState<AutoMailSettings>({ enabled: false, dailyLimit: 20, gapMinutes: 12, followUpDays: 5, requireApproval: true, stopOnReply: true, includeUnsubscribe: true });
   const total = useMemo(() => Object.values(counts).reduce((sum, count) => sum + count, 0), [counts]);
@@ -53,9 +62,39 @@ export default function Home() {
   function normalizeCountry(value: string) { return value.trim().toLocaleLowerCase(); }
   function productKey(value: string) { return value.trim().toLocaleLowerCase().replace(/\s+/g, " ").slice(0, 120); }
   function domainOf(website: string) { try { return new URL(website).hostname.replace(/^www\./, "").toLowerCase(); } catch { return ""; } }
+  function normalizedWebsite(value: string) { const trimmed = value.trim(); if (!trimmed) return ""; return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`; }
   function readBuyerDatabase(): BuyerDatabase {
     try { const parsed = JSON.parse(localStorage.getItem("beibeijia-buyer-database") || ""); return parsed?.records ? parsed : { version: 1, records: [] }; }
     catch { return { version: 1, records: [] }; }
+  }
+  function currentManufacturerProfile(id = activePresetId || `manufacturer-${Date.now()}`): ManufacturerProfile {
+    const website = normalizedWebsite(supplierWebsite);
+    return { id, preset_name: presetName.trim() || supplierCompany.trim() || domainOf(website), company_name: supplierCompany.trim(), contact_name: senderName.trim(), email: senderEmail.trim(), whatsapp: senderWhatsapp.trim(), website, location: supplierLocation.trim(), company_intro_en: supplierIntroEn.trim(), strengths_en: supplierStrengthsEn.trim() };
+  }
+  function applyManufacturerProfile(profile: ManufacturerProfile) {
+    setActivePresetId(profile.id); setPresetName(profile.preset_name); setSupplierCompany(profile.company_name); setSenderName(profile.contact_name); setSenderEmail(profile.email); setSenderWhatsapp(profile.whatsapp); setSupplierWebsite(profile.website); setSupplierLocation(profile.location); setSupplierIntroEn(profile.company_intro_en); setSupplierStrengthsEn(profile.strengths_en);
+  }
+  function persistManufacturerPresets(next: ManufacturerProfile[], activeId: string) {
+    localStorage.setItem("beibeijia-manufacturer-presets", JSON.stringify({ version: 1, active_id: activeId, profiles: next }));
+    setManufacturerPresets(next); setActivePresetId(activeId);
+  }
+  function saveManufacturerPreset(createNew = false) {
+    const website = normalizedWebsite(supplierWebsite);
+    if (!website || !domainOf(website)) { setMessage("请先填写有效的厂家官网。"); return; }
+    const id = createNew || !activePresetId ? `manufacturer-${Date.now()}` : activePresetId;
+    const profile = currentManufacturerProfile(id);
+    const next = [...manufacturerPresets.filter(item => item.id !== id), profile];
+    persistManufacturerPresets(next, id); applyManufacturerProfile(profile);
+    localStorage.setItem("beibeijia-sender-profile", JSON.stringify({ name: profile.contact_name, email: profile.email, whatsapp: profile.whatsapp }));
+    setMessage(createNew ? `已新建厂家预设“${profile.preset_name}”。` : `已保存厂家预设“${profile.preset_name}”。`);
+  }
+  function deleteManufacturerPreset() {
+    if (!activePresetId) return;
+    const next = manufacturerPresets.filter(item => item.id !== activePresetId);
+    const fallback = next[0]; persistManufacturerPresets(next, fallback?.id || "");
+    if (fallback) applyManufacturerProfile(fallback);
+    else { setPresetName(""); setSupplierCompany(""); setSenderName(""); setSenderEmail(""); setSenderWhatsapp(""); setSupplierLocation(""); setSupplierWebsite(""); setSupplierIntroEn(""); setSupplierStrengthsEn(""); }
+    setMessage("厂家预设已删除。");
   }
   function exclusionsFor(targetCountry: string, _targetCity: string, targetHs: string, targetProduct: string, database = readBuyerDatabase()) {
     const countryKey = normalizeCountry(targetCountry); const hsKey = normalizeHs(targetHs); const fallbackProductKey = productKey(targetProduct);
@@ -75,9 +114,13 @@ export default function Home() {
   }
 
   useEffect(() => {
+    const savedPresets = localStorage.getItem("beibeijia-manufacturer-presets");
+    if (savedPresets) {
+      try { const data = JSON.parse(savedPresets); const profiles = Array.isArray(data?.profiles) ? data.profiles as ManufacturerProfile[] : []; setManufacturerPresets(profiles); const selected = profiles.find(item => item.id === data.active_id) || profiles[0]; if (selected) applyManufacturerProfile(selected); } catch { /* ignore invalid local data */ }
+    }
     const saved = localStorage.getItem("beibeijia-sender-profile");
-    if (saved) {
-      try { const profile = JSON.parse(saved); setSenderName(profile.name || "Brien"); setSenderEmail(profile.email || ""); setSenderWhatsapp(profile.whatsapp || ""); } catch { /* ignore invalid local data */ }
+    if (saved && !savedPresets) {
+      try { const profile = JSON.parse(saved); setSenderName(profile.name || ""); setSenderEmail(profile.email || ""); setSenderWhatsapp(profile.whatsapp || ""); } catch { /* ignore invalid local data */ }
     }
     const savedAutomation = localStorage.getItem("beibeijia-auto-mail-settings");
     if (savedAutomation) { try { setAutoMail(current => ({ ...current, ...JSON.parse(savedAutomation) })); } catch { /* ignore invalid local data */ } }
@@ -97,30 +140,25 @@ export default function Home() {
         if (!active || !data.generated_at || !data.summary || !data.categories) return;
         setResult(data);
         mergeResultIntoBuyerDatabase(data);
-        setCountry(data.task?.country || "");
-        setCity(data.task?.city || "");
-        setHsCode(data.task?.hs_code || "6303920090");
-        setProduct(data.task?.product_description || product);
-        setProductEnglish(data.task?.product_description_en || "custom-made products with flexible specifications, colours and retail packaging");
-        setTargetCustomerPrompt(data.task?.target_customer_prompt || targetCustomerPrompt);
         setMessage(`已自动载入最新回传：${data.summary.qualified || 0} 家客户。`);
       })
       .catch(() => { /* 首次没有回传文件时保持空白 */ });
     return () => { active = false; };
-  // product is only the fallback for malformed legacy data
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (!country.trim() || !city.trim() || (!normalizeHs(hsCode) && !product.trim())) { setExisting(""); return; }
-    setExisting(exclusionsFor(country, city, hsCode, product));
-  }, [country, city, hsCode, product]);
+    const region = targetRegion.trim() || country.trim();
+    if (!region || (!normalizeHs(hsCode) && !product.trim() && !supplierWebsite.trim())) { setExisting(""); return; }
+    setExisting(exclusionsFor(region, city, hsCode, product || supplierWebsite));
+  }, [targetRegion, country, city, hsCode, product, supplierWebsite]);
 
   function buyerKey(buyer: Buyer) { try { return new URL(buyer.website).hostname.replace(/^www\./, ""); } catch { return buyer.company.toLowerCase(); } }
-  function draftKey(buyer: Buyer, nextChannel: Channel) { return `beibeijia-outreach:${buyerKey(buyer)}:${nextChannel}`; }
+  function draftKey(buyer: Buyer, nextChannel: Channel) { return `beibeijia-outreach:${activePresetId || supplierCompany.trim().toLowerCase() || "manufacturer"}:${buyerKey(buyer)}:${nextChannel}`; }
   function saveSenderProfile() {
     localStorage.setItem("beibeijia-sender-profile", JSON.stringify({ name: senderName, email: senderEmail, whatsapp: senderWhatsapp }));
-    setMessage("发件人资料已保存在本机浏览器。邮箱和WhatsApp API接入后可直接复用。");
+    if (activePresetId) saveManufacturerPreset(false);
+    else setMessage("联系人资料已保存在本机浏览器。建议在首页保存为厂家预设，以便切换厂家复用。");
   }
   function languageFor(targetCountry: string) {
     const value = targetCountry.toLowerCase();
@@ -165,8 +203,17 @@ export default function Home() {
     const lang = languageFor(result?.task.country || country);
     const receiver = buyer.contact_person || `${buyer.company} team`;
     const offer = result?.task.product_description_en || productEnglish.trim() || "custom-made products";
-    const greeting = buyer.whatsapp_greeting_en || `Hello ${receiver}, this is ${senderName} from ${supplierCompany} in Hangzhou, China. ${englishHook(buyer)} We supply ${offer}. Would this be relevant to your current sourcing? If so, may I send a short catalogue and pricing options selected for ${buyer.company}?`;
-    const english = nextChannel === "email" ? { subject: `A tailored product proposal for ${buyer.company}`, body: `Dear ${receiver},\n\nMy name is ${senderName} from ${supplierCompany} in Hangzhou, China. ${englishHook(buyer)}\n\nWe supply ${offer}. We can prepare a focused selection and quotation around your current assortment instead of sending a generic catalogue.\n\nAre you the right person for purchasing or product management? If not, could you kindly forward this message to the relevant colleague?\n\nBest regards,\n${senderName}\n${supplierCompany}\nEmail: ${senderEmail}\nWhatsApp: ${senderWhatsapp}` } : { subject: "", body: greeting };
+    const resolvedSupplier = result?.task.supplier_profile || {};
+    const resolvedName = supplierCompany.trim() || resolvedSupplier.company_name || domainOf(normalizedWebsite(supplierWebsite)) || "our company";
+    const resolvedContact = senderName.trim() || resolvedSupplier.contact_name || "the export team";
+    const resolvedLocation = supplierLocation.trim() || resolvedSupplier.location || "";
+    const resolvedIntro = supplierIntroEn.trim() || resolvedSupplier.company_intro_en || "";
+    const resolvedStrengths = supplierStrengthsEn.trim() || resolvedSupplier.strengths_en || "";
+    const identity = `${resolvedContact} from ${resolvedName}${resolvedLocation ? ` in ${resolvedLocation}` : ""}`;
+    const intro = resolvedIntro ? `About us: ${resolvedIntro.replace(/[.\s]+$/, "")}. ` : "";
+    const strengths = resolvedStrengths ? ` ${resolvedStrengths.replace(/[.\s]+$/, "")}.` : "";
+    const greeting = `Hello ${receiver}, this is ${identity}. ${englishHook(buyer)} ${intro}We supply ${offer.replace(/[.\s]+$/, "")}.${strengths} May I send a short catalogue and suitable sample options, or could you direct me to the person responsible for sourcing?`;
+    const english = nextChannel === "email" ? { subject: `A tailored product proposal for ${buyer.company}`, body: `Dear ${receiver},\n\nMy name is ${identity}. ${englishHook(buyer)}\n\n${intro}We supply ${offer.replace(/[.\s]+$/, "")}.${strengths} We can prepare a focused selection and quotation around your current requirements.\n\nAre you the right person for purchasing or product management? If not, could you kindly forward this message to the relevant colleague?\n\nBest regards,\n${resolvedContact}\n${resolvedName}${supplierWebsite ? `\nWebsite: ${normalizedWebsite(supplierWebsite)}` : ""}\nEmail: ${senderEmail || resolvedSupplier.email || ""}\nWhatsApp: ${senderWhatsapp || resolvedSupplier.whatsapp || ""}` } : { subject: "", body: greeting };
     if (nextChannel === "whatsapp") return { channel: nextChannel, local_language: "英语", local: english, english, status: "draft", updated_at: new Date().toISOString() };
     const local = localCopy(buyer, nextChannel, lang.code);
     return { channel: nextChannel, local_language: lang.code === "en" ? "英语" : lang.name, local: lang.code === "en" ? english : local, english, status: "draft", updated_at: new Date().toISOString() };
@@ -246,12 +293,14 @@ export default function Home() {
 
   function generatePrompt() {
     const normalizedHs = normalizeHs(hsCode);
-    if (!country.trim() || !city.trim() || (normalizedHs && !/^\d{6,10}$/.test(normalizedHs)) || !product.trim() || !productEnglish.trim() || !targetCustomerPrompt.trim()) {
-      setMessage("请填写国家、城市、产品信息、英文卖点和目标客户提示；HS Code 可留空。"); return;
+    const website = normalizedWebsite(supplierWebsite);
+    if (!website || !domainOf(website) || !targetRegion.trim() || (normalizedHs && !/^\d{6,10}$/.test(normalizedHs))) {
+      setMessage("请填写有效的厂家官网和目标地区；HS Code 可留空。"); return;
     }
-    const payload = { supplier_profile: { company_name: supplierCompany.trim() }, country: country.trim(), city: city.trim(), hs_code: normalizedHs, product_description: product.trim(), product_description_en: productEnglish.trim(), target_customer_prompt: targetCustomerPrompt.trim(), targets: counts, candidate_pool_multiplier: candidatePoolMultiplier, continue_until_exhausted: true, qualification_gate: { require_verified_public_whatsapp: true, count_only_leads_with_verified_whatsapp: true, return_fewer_instead_of_padding: true }, discovery_channels: ["local_language_web", "official_store_locators", "shopping_centre_directories", "brand_stockists", "company_registries", "industry_associations", "trade_fairs", "marketplaces", "public_catalogues", "job_postings", "customs_data_when_accessible", "linkedin_public_company_and_staff_pages", "facebook_business_about_pages", "instagram_business_bios", "youtube_business_about_pages", "x_business_profiles", "local_market_social_platforms"], contact_enrichment: { enabled: true, when_official_site_missing_contact: ["official_registries_and_filings", "industry_associations_and_trade_fairs", "public_staff_and_procurement_pages", "linkedin_public_company_and_staff_pages", "facebook_business_about_pages", "instagram_business_bios", "youtube_business_about_pages", "x_business_profiles", "local_market_social_platforms", "store_marketplace_and_social_business_profiles", "press_releases_and_public_documents", "switchboard_or_contact_form"], target_roles_by_category: Object.fromEntries(directions.map(item => [item.key, item.roles])), social_media_policy: { public_business_pages_only: true, allow_named_role_discovery: true, allow_public_business_email_phone_whatsapp: true, require_company_identity_match: true, require_profile_url: true, forbid_login_bypass: true, forbid_private_profile_scraping: true, forbid_inferred_email: true }, generate_whatsapp_greeting_en: true, whatsapp_greeting_style: "short_personalized_permission_based", contact_priority: ["verified_public_whatsapp"], require_source_url: true, require_verification_date: true, forbid_guessed_emails: true, verification_labels: ["verified_public", "not_found"] }, china_sourcing_signals: ["customs_from_china", "china_asia_sourcing_roles", "china_office_or_supplier_policy", "chinese_trade_fairs", "made_in_china_assortment"], excluded_types: exclude.split(/[，,、]/).map(v => v.trim()).filter(Boolean), exclude_existing: existing.split(/[,，\n]/).map(v => v.trim()).filter(Boolean), contact_policy: "verified_public_whatsapp_required", deduplicate_by: ["website_domain", "normalized_company_name", "public_email", "public_whatsapp"], output_format: "business_report_and_json", human_report_language: "zh-CN", return_path: "public/data/latest-buyers.json" };
+    const manufacturer = currentManufacturerProfile();
+    const payload = { supplier_profile: { company_name: manufacturer.company_name, contact_name: manufacturer.contact_name, email: manufacturer.email, whatsapp: manufacturer.whatsapp, website, location: manufacturer.location, company_intro_en: manufacturer.company_intro_en, strengths_en: manufacturer.strengths_en }, supplier_website_analysis: { enabled: true, source_of_truth_url: website, inspect_public_pages: ["home", "about", "products", "catalogues", "projects", "contact"], extract: ["company_name", "product_categories", "product_description_en", "value_proposition", "customization_capabilities", "likely_buyer_profiles", "public_contact_details"], use_manual_fields_as_overrides: true, forbid_unsupported_claims: true }, target_region: targetRegion.trim(), country: "", city: "", hs_code: normalizedHs, product_description: product.trim(), product_description_en: productEnglish.trim(), target_customer_prompt: targetCustomerPrompt.trim(), targets: counts, candidate_pool_multiplier: candidatePoolMultiplier, continue_until_exhausted: true, qualification_gate: { require_verified_public_whatsapp: true, count_only_leads_with_verified_whatsapp: true, return_fewer_instead_of_padding: true }, discovery_channels: ["local_language_web", "official_store_locators", "shopping_centre_directories", "brand_stockists", "company_registries", "industry_associations", "trade_fairs", "marketplaces", "public_catalogues", "job_postings", "customs_data_when_accessible", "linkedin_public_company_and_staff_pages", "facebook_business_about_pages", "instagram_business_bios", "youtube_business_about_pages", "x_business_profiles", "local_market_social_platforms"], contact_enrichment: { enabled: true, generate_whatsapp_greeting_en: true, whatsapp_greeting_style: "short_personalized_permission_based", contact_priority: ["verified_public_whatsapp"], require_source_url: true, require_verification_date: true, forbid_guessed_emails: true }, excluded_types: exclude.split(/[，,、]/).map(v => v.trim()).filter(Boolean), exclude_existing: existing.split(/[,，\n]/).map(v => v.trim()).filter(Boolean), contact_policy: "verified_public_whatsapp_required", deduplicate_by: ["website_domain", "normalized_company_name", "public_email", "public_whatsapp"], output_format: "business_report_and_json", human_report_language: "zh-CN", return_path: "public/data/latest-buyers.json" };
     setPrompt(`$find-target-buyers\n\n${JSON.stringify(payload, null, 2)}`);
-    setMessage(`已生成渠道探索指令：五类合计最多 ${total} 家，指定目标渠道会优先遵循你的客户提示词。`);
+    setMessage(`已生成官网驱动的客户探索指令：Codex会先读取厂家网站，再到 ${targetRegion.trim()} 寻找最多 ${total} 家目标客户。`);
   }
 
   async function copyPrompt() {
@@ -270,17 +319,23 @@ export default function Home() {
 
   return <main>
     <header className="site-header"><div className="brand-mark">贝</div><div><h1>贝贝家外贸复制系统</h1><p>特定区域销售渠道探索 · WhatsApp 一键触达</p></div><button className="automation-entry" onClick={() => setShowAutomation(true)}>邮件自动化 <b>{autoMail.enabled ? "已启用" : "备用"}</b></button><span className="phase">本地测试版</span></header>
-    <section className="intro"><div><span>CHANNEL DISCOVERY + WHATSAPP</span><h2>找到销售渠道，写好招呼，一键打开 WhatsApp</h2><p>只使用公开核验的企业 WhatsApp；系统按每家企业的业务证据生成英文招呼，由业务员在 WhatsApp 中确认后发送。</p></div><ol><li className="active">找渠道</li><li>核验 WhatsApp</li><li>生成招呼</li><li>一键联系</li></ol></section>
+    <section className="intro"><div><span>WEBSITE TO CUSTOMERS</span><h2>输入厂家官网，选择地区，开始寻找客户</h2><p>Codex先从官网识别厂家、产品和卖点，再寻找当地销售渠道与公开核验的企业 WhatsApp，并为每家客户生成英文招呼。</p></div><ol><li className="active">读取官网</li><li>找目标客户</li><li>生成招呼</li><li>一键联系</li></ol></section>
     <div className="layout">
       <section className="card form-card">
-        <div className="card-title"><span>01</span><div><h3>产品与区域</h3><p>城市必填，HS Code 可选</p></div></div>
-        <div className="form-grid"><label className="full">供应商名称<input value={supplierCompany} onChange={e => setSupplierCompany(e.target.value)} /></label><label>目标国家或地区<input value={country} onChange={e => setCountry(e.target.value)} placeholder="例如：阿联酋、瑞士、韩国" /></label><label>目标城市（必填）<input value={city} onChange={e => setCity(e.target.value)} placeholder="例如：Dubai、Abu Dhabi" /></label><label className="full">HS Code（选填）<input value={hsCode} onChange={e => setHsCode(e.target.value)} inputMode="numeric" /></label><label className="full">产品信息（中文，用于搜索）<textarea rows={3} value={product} onChange={e => setProduct(e.target.value)} /></label><label className="full">目标客户提示词（必填）<textarea rows={3} value={targetCustomerPrompt} onChange={e => setTargetCustomerPrompt(e.target.value)} placeholder="例如：优先寻找整装设计师、室内设计工作室、装修公司和酒店工程承包商" /></label><label className="full">英文产品与卖点（用于 WhatsApp 招呼）<textarea rows={2} value={productEnglish} onChange={e => setProductEnglish(e.target.value)} placeholder="例如：custom wallcoverings, wallpaper and decorative films with custom designs and packaging" /></label><label className="full">排除类型<input value={exclude} onChange={e => setExclude(e.target.value)} /></label><label className="full">历史客户自动排除 <small>已按“{country || "国家"} / {normalizeHs(hsCode) || "产品描述"}”匹配 {existingCount} 项域名、企业、邮箱或WhatsApp</small><textarea className="history-preview" rows={2} value={existing} readOnly placeholder="当前国家和产品还没有历史客户，获得首批结果后会自动建立主库" /></label></div>
-        <div className="card-title second"><span>02</span><div><h3>销售渠道数量</h3><p>四类标准渠道和一类自定义目标分别查找</p></div><strong>{total} 家</strong></div>
+        <div className="card-title"><span>01</span><div><h3>厂家官网</h3><p>保存一次，以后换厂家时直接切换</p></div></div>
+        <div className="preset-toolbar"><select aria-label="选择厂家预设" value={activePresetId} onChange={e => { if (!e.target.value) { setActivePresetId(""); return; } const profile = manufacturerPresets.find(item => item.id === e.target.value); if (profile) applyManufacturerProfile(profile); }}><option value="">未保存的厂家资料</option>{manufacturerPresets.map(profile => <option key={profile.id} value={profile.id}>{profile.preset_name} · {profile.company_name}</option>)}</select><button type="button" onClick={() => saveManufacturerPreset(false)}>保存当前预设</button><button type="button" onClick={() => saveManufacturerPreset(true)}>另存为新预设</button><button type="button" className="danger" disabled={!activePresetId} onClick={deleteManufacturerPreset}>删除</button></div>
+        <label className="website-primary">厂家门户网站<input value={supplierWebsite} onChange={e => setSupplierWebsite(e.target.value)} placeholder="例如：https://www.yourfactory.com" /></label>
+        <details className="advanced-settings"><summary>厂家联系资料（首次使用时填写）</summary><div className="form-grid manufacturer-grid"><label>预设名称<input value={presetName} onChange={e => setPresetName(e.target.value)} placeholder="例如：墙布工厂" /></label><label>厂家名称<input value={supplierCompany} onChange={e => setSupplierCompany(e.target.value)} placeholder="Codex也会从官网核验" /></label><label>联系人<input value={senderName} onChange={e => setSenderName(e.target.value)} /></label><label>所在地区（选填）<input value={supplierLocation} onChange={e => setSupplierLocation(e.target.value)} /></label><label>联系邮箱<input value={senderEmail} onChange={e => setSenderEmail(e.target.value)} /></label><label>自己的 WhatsApp<input value={senderWhatsapp} onChange={e => setSenderWhatsapp(e.target.value)} /></label><label className="full">厂家英文简介（选填）<textarea rows={2} value={supplierIntroEn} onChange={e => setSupplierIntroEn(e.target.value)} placeholder="留空时由Codex从官网提取" /></label><label className="full">厂家英文优势（选填）<textarea rows={2} value={supplierStrengthsEn} onChange={e => setSupplierStrengthsEn(e.target.value)} placeholder="留空时由Codex从官网提取" /></label></div></details>
+        <div className="card-title second"><span>02</span><div><h3>目标地区</h3><p>国家、城市或城市组合均可</p></div></div>
+        <label className="region-primary">准备开发哪个地区？<input value={targetRegion} onChange={e => setTargetRegion(e.target.value)} placeholder="例如：Dubai、阿联酋、Dubai + Sharjah" /></label>
+        <details className="advanced-settings"><summary>高级搜索设置（通常不需要修改）</summary><div className="form-grid"><label className="full">HS Code（选填）<input value={hsCode} onChange={e => setHsCode(e.target.value)} inputMode="numeric" /></label><label className="full">产品信息（选填，覆盖官网识别结果）<textarea rows={3} value={product} onChange={e => setProduct(e.target.value)} /></label><label className="full">偏好的目标客户（选填）<textarea rows={3} value={targetCustomerPrompt} onChange={e => setTargetCustomerPrompt(e.target.value)} placeholder="例如：酒店翻新项目的设计师和装修公司" /></label><label className="full">英文产品卖点（选填，覆盖官网识别结果）<textarea rows={2} value={productEnglish} onChange={e => setProductEnglish(e.target.value)} /></label><label className="full">排除类型<input value={exclude} onChange={e => setExclude(e.target.value)} /></label><label className="full">历史客户自动排除 <small>已按“{targetRegion || "目标地区"} / {normalizeHs(hsCode) || domainOf(normalizedWebsite(supplierWebsite)) || "官网产品"}”匹配 {existingCount} 项</small><textarea className="history-preview" rows={2} value={existing} readOnly placeholder="获得首批结果后会自动建立主库" /></label></div></details>
+        <details className="advanced-settings channels"><summary>客户数量与渠道设置 <strong>{total} 家</strong></summary>
         <div className="search-depth"><div><b>覆盖强度</b><small>先审查约 {total * candidatePoolMultiplier} 家候选，再返回最匹配的 {total} 家</small></div><select aria-label="候选池倍数" value={candidatePoolMultiplier} onChange={e => setCandidatePoolMultiplier(Number(e.target.value))}><option value="2">标准 · 2倍</option><option value="4">深入 · 4倍</option><option value="6">全面 · 6倍</option></select></div>
         <div className="direction-grid">{directions.map(item => <article key={item.key}><div className="direction-top"><i>{item.label.slice(0, 1)}</i><div><h4>{item.label}</h4><p>{item.note}</p></div><select aria-label={`${item.label}数量`} value={counts[item.key]} onChange={e => setCounts(current => ({ ...current, [item.key]: Number(e.target.value) }))}><option value="0">0</option><option value="3">3</option><option value="5">5</option><option value="10">10</option><option value="20">20</option></select></div><small>联系人：{item.roles.join(" / ")}</small></article>)}</div>
-        <button className="generate" onClick={generatePrompt}>生成Skill 1调用指令 <b>→</b></button>{message && <p className="message">{message}</p>}
+        </details>
+        <button className="generate" onClick={generatePrompt}>生成找客户指令 <b>→</b></button>{message && <p className="message">{message}</p>}
       </section>
-      <aside className="card output-card"><div className="card-title"><span>03</span><div><h3>Codex调用与回传</h3><p>业务员不需要阅读或处理JSON</p></div></div>{prompt ? <><textarea className="prompt" readOnly value={prompt} /><button className="copy" onClick={copyPrompt}>① 复制完整指令</button><button className="load" onClick={loadLatestResult}>② 读取最新结果</button><div className="rule"><b>Codex完成后会同时</b><ul><li>按城市探索五类销售渠道</li><li>优先执行目标客户提示词</li><li>保存机器数据并自动去重</li><li>为公开 WhatsApp 生成英文招呼</li></ul></div></> : <div className="placeholder"><div>$</div><h4>等待生成</h4><p>左侧填写参数后，调用指令会完整显示在这里。</p></div>}</aside>
+      <aside className="card output-card"><div className="card-title"><span>03</span><div><h3>交给 Codex 执行</h3><p>复制后直接粘贴发送</p></div></div>{prompt ? <><textarea className="prompt" readOnly value={prompt} /><button className="copy" onClick={copyPrompt}>① 复制完整指令</button><button className="load" onClick={loadLatestResult}>② 读取最新结果</button><div className="rule"><b>Codex会自动完成</b><ul><li>读取厂家官网和产品页面</li><li>判断适合的客户类型</li><li>在目标地区寻找公开 WhatsApp</li><li>按厂家和客户证据写英文招呼</li><li>保存结果并自动排除重复客户</li></ul></div></> : <div className="placeholder"><div>$</div><h4>等待生成</h4><p>填写厂家官网和目标地区后即可生成。</p></div>}</aside>
     </div>
     {result && <section className="results">
       <header><div><span>最新回传</span><h2>{result.task.city ? `${result.task.city} · ` : ""}{result.task.country}{result.task.hs_code ? ` · HS ${result.task.hs_code}` : ""}</h2><p>{result.task.product_description}</p></div><div className="result-metrics"><b>{result.summary.candidates_reviewed ?? result.summary.qualified}<small>审查候选</small></b><b>{result.summary.qualified}<small>合格客户</small></b><b>{result.summary.with_named_contact}<small>具名联系人</small></b><b>{result.summary.with_public_email}<small>公开邮箱</small></b><b>{(result.summary.china_sourcing_strong || 0) + (result.summary.china_sourcing_moderate || 0)}<small>中国采购信号</small></b></div></header>

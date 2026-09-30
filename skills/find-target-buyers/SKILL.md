@@ -1,15 +1,29 @@
 ---
 name: find-target-buyers
-description: Find and verify overseas sales channels in a target city from a product description, optional HS code, and preferred customer profile. Use for retail chains, local stores, import distributors, online stores, designers, contractors, project firms, and other specified buyer types with public contacts and evidence.
+description: Find and verify overseas sales channels from a supplier website and target region, or from an explicit product brief. Use for retail chains, stores, distributors, ecommerce, designers, contractors, and other buyer types with public contacts and evidence.
 ---
 
 # Find Target Buyers
 
-Require `country`, `city`, `product_description`, `target_customer_prompt`, and a `targets` object containing requested counts for any of: `large_chain`, `small_store`, `import_distributor`, `online_store`, `custom_target`. `hs_code` is optional: use it as supporting classification and customs evidence when supplied, but do not require or invent it. Accept `product_description_en` when provided and preserve it for outreach copy. Proceed without clarification when the required fields are valid.
+Support two input modes. Prefer website-first mode when `supplier_profile.website` and `target_region` are present. In this mode, the website and target region are sufficient: `country`, `city`, `product_description`, `product_description_en`, `target_customer_prompt`, and `hs_code` may be empty. In manual mode, require `country`, `city`, `product_description`, and `target_customer_prompt`. Both modes require a `targets` object containing requested counts for any of: `large_chain`, `small_store`, `import_distributor`, `online_store`, `custom_target`. Never invent an HS code.
 
-Treat `city` as the primary geographic scope. Include businesses located in or demonstrably serving that city. Do not silently expand to the whole country merely to fill counts; mark nearby or country-wide candidates as overflow with their actual location.
+## Supplier website profiling
 
-`target_customer_prompt` is a business preference, not just a search keyword. Translate it into suitable local-language role, service, project, and industry terms, then use those signals to rank candidates. For example, a request favoring whole-home designers or renovation companies should search interior design studios, fit-out contractors, turnkey renovation firms, hospitality design practices, project portfolios, local directories, awards, and trade-fair listings—not only companies that already list the exact product.
+In website-first mode, open the submitted supplier website and inspect accessible public home, about, product/category, catalogue, project, and contact pages before searching for buyers. Build an evidence-backed supplier profile covering:
+
+- company or brand name;
+- primary product categories and a concise English product description;
+- stated customization, material, specification, packaging, MOQ, sample, certification, or project capabilities;
+- likely downstream buyer/channel types and suitable decision-maker roles;
+- public supplier contact details useful in outreach.
+
+Treat submitted non-empty manual fields as explicit overrides; use website evidence for missing fields. Do not copy unsupported marketing claims, infer certifications, or invent capabilities. If the site is inaccessible or too thin to identify a product, stop and clearly request a working product/category page or a short product description rather than searching generically.
+
+Resolve `target_region` into the most useful country and city/service-area representation for discovery and return both normalized values in the result. A region may be a country, one city, or several nearby cities. Search each named place without silently widening beyond the submitted region.
+
+Treat the resolved city/service area as the primary geographic scope. Include businesses located in or demonstrably serving it. Do not silently expand merely to fill counts; mark nearby or country-wide candidates as overflow with their actual location.
+
+When `target_customer_prompt` is provided, treat it as a business preference, not just a search keyword. Translate it into suitable local-language role, service, project, and industry terms, then use those signals to rank candidates. When it is empty in website-first mode, infer several plausible downstream customer profiles from the evidenced product and search across the applicable requested categories rather than demanding clarification.
 
 ## Coverage-first discovery
 
@@ -64,7 +78,7 @@ For every lead with a verified WhatsApp number, write `whatsapp_greeting_en`: a 
 
 - identify the supplier by company name; mention its location only when the user explicitly provides a current, relevant supplier location;
 - mention one company-specific reason for contacting that buyer, grounded in `product_fit_evidence` or `demand_evidence`;
-- describe the supplied product using `product_description_en` when provided, otherwise a concise English rendering of the submitted product;
+- describe the supplied product using the manual `product_description_en` when provided, otherwise the evidence-backed English product description extracted from the supplier website;
 - ask permission to send a relevant catalogue, sample selection, or pricing rather than attaching or pushing a full offer immediately;
 - avoid unsupported claims, generic flattery, urgency, discounts, and bulk-message wording;
 - ask for referral to the correct buyer when no decision maker is known;
